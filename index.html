@@ -165,7 +165,18 @@
         try {
           const owner = document.getElementById("ownerName").value;
           const notes = document.getElementById("notes").value.trim();
-          await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
+          try {
+  await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
+} catch (e) {
+  const msg = (e?.message || "").toLowerCase();
+  if (msg.includes("blocks_no_overlap") || msg.includes("exclude") || msg.includes("overlap")) {
+    alert("Those dates overlap with an existing block. Please pick different dates.");
+  } else {
+    alert(e.message || e);
+  }
+  return;
+}
+
 
           // refresh
           calendar.removeAllEvents();
