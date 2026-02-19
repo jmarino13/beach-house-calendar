@@ -85,7 +85,7 @@
     const email = document.getElementById("email").value.trim();
     if (!email) return alert("Enter your email");
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await sb.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: window.location.href }
     });
@@ -94,7 +94,7 @@
   };
 
   signOutBtn.onclick = async () => {
-    await supabase.auth.signOut();
+    await sb.auth.signOut();
     location.reload();
   };
 
@@ -113,7 +113,7 @@
   }
 
   async function loadBlocks() {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from("blocks")
       .select("id,start_date,end_date,owner_name,notes,created_by");
 
@@ -134,8 +134,8 @@
     // Convert endExclusive -> inclusive end_date
     const inclusiveEnd = addDaysISO(endExclusiveISO, -1);
 
-    const user = (await supabase.auth.getUser()).data.user;
-    const { error } = await supabase.from("blocks").insert({
+    const user = (await sb.auth.getUser()).data.user;
+    const { error } = await sb.from("blocks").insert({
       start_date: startISO,
       end_date: inclusiveEnd,
       owner_name: ownerName,
@@ -146,7 +146,7 @@
   }
 
   async function deleteBlock(id) {
-    const { error } = await supabase.from("blocks").delete().eq("id", id);
+    const { error } = await sb.from("blocks").delete().eq("id", id);
     if (error) throw error;
   }
 
@@ -203,7 +203,7 @@
   }
 
   async function refreshUI() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
 
     if (!session) {
       authCard.style.display = "block";
