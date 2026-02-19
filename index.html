@@ -83,14 +83,7 @@
  <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-// If arriving from a magic link, exchange the code in the URL for a session
-(async () => {
-  try {
-    await sb.auth.exchangeCodeForSession(window.location.href);
-  } catch (e) {
-    // ignore if there's no code in the URL
-  }
-})();
+
 
 
 
