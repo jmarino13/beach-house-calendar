@@ -74,11 +74,12 @@
   </div>
 
 <script>
-  // ✅ Put your real values here (Supabase → Project Settings → API)
-  const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_Up-LmGCc1StDrP-I9PMj3Q_70wuT5UH";
+  // ✅ Put your real values here
+  const SUPABASE_URL = "https://acbskcpmxwnixwmbyfc.supabase.co";
+  const SUPABASE_KEY = "PASTE_YOUR_sb_publishable_KEY_HERE";
 
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Supabase client (UMD build exposes global `supabase`)
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const authCard = document.getElementById("authCard");
   const appCard = document.getElementById("appCard");
@@ -87,26 +88,25 @@
   const loginError = document.getElementById("loginError");
 
   document.getElementById("loginBtn").onclick = async () => {
-    loginError.textContent = "";
+    loginError.textContent = "Signing in...";
     const email = document.getElementById("email").value.trim().toLowerCase();
     const password = document.getElementById("password").value;
 
-    if (!email || !password) {
-      loginError.textContent = "Enter email and password.";
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    console.log("signInWithPassword:", { data, error });
+
+    if (error) {
+      loginError.textContent = "❌ " + error.message;
       return;
     }
 
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      loginError.textContent = error.message;
-      return;
-    }
+    loginError.textContent = "";
     await refreshUI();
   };
 
   signOutBtn.onclick = async () => {
     await sb.auth.signOut();
-    location.reload();
+    await refreshUI();
   };
 
   function toISODate(d) {
@@ -127,13 +127,16 @@
       .from("blocks")
       .select("id,start_date,end_date,owner_name,notes,created_by");
 
-    if (error) { alert(error.message); return []; }
+    if (error) {
+      alert(error.message);
+      return [];
+    }
 
     return (data || []).map(b => ({
       id: b.id,
       title: b.owner_name + (b.notes ? ` — ${b.notes}` : ""),
       start: b.start_date,
-      end: addDaysISO(b.end_date, 1),
+      end: addDaysISO(b.end_date, 1), // FullCalendar end is exclusive
       allDay: true
     }));
   }
@@ -149,6 +152,7 @@
       notes: notes || null,
       created_by: user.id
     });
+
     if (error) throw error;
   }
 
@@ -178,7 +182,7 @@
           await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
         } catch (e) {
           const msg = (e?.message || "").toLowerCase();
-          if (msg.includes("blocks_no_overlap") || msg.includes("exclude") || msg.includes("overlap")) {
+          if (msg.includes("overlap") || msg.includes("exclude")) {
             alert("Those dates overlap with an existing block. Please pick different dates.");
           } else {
             alert(e.message || e);
@@ -206,6 +210,7 @@
 
   async function refreshUI() {
     const { data: { session } } = await sb.auth.getSession();
+    console.log("session:", session);
 
     if (!session) {
       authCard.style.display = "block";
@@ -226,5 +231,6 @@
   sb.auth.onAuthStateChange(() => refreshUI());
   refreshUI();
 </script>
+
 </body>
 </html>
