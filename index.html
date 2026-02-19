@@ -13,6 +13,7 @@
 
   <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
 // If arriving from a magic link, exchange the code in the URL for a session
 (async () => {
   try {
@@ -82,6 +83,10 @@
   const SUPABASE_ANON_KEY = "sb_publishable_Up-LmGCc1StDrP-I9PMj3Q_70wuT5UH";
 
  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+(async () => {
+  try { await sb.auth.exchangeCodeForSession(window.location.href); } catch (e) {}
+})();
+
 
 
 
