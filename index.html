@@ -46,14 +46,13 @@
       <div class="row">
         <input id="email" type="email" placeholder="Email" />
         <input id="password" type="password" placeholder="Password" />
-        <button id="loginBtn">Sign In</button>
+        <button id="loginBtn" type="button">Sign In</button>
       </div>
-     <div id="loginError" class="error"></div>
-
-
+      <div id="loginError" class="error"></div>
       <div class="muted" style="margin-top:10px;">
         Enter your email and password to sign in.
-    
+      </div>
+    </div>
 
     <div id="appCard" class="card" style="display:none;">
       <div class="row">
@@ -73,11 +72,12 @@
   </div>
 
 <script>
-  // ✅ Put your real values here
-  const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co/";
+  console.log("✅ beach-house-calendar script loaded");
+
+  // Put your real values here (NO trailing slash)
+  const SUPABASE_URL = "https://acbskcpmxwnixwmbyfc.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjYnNrY3BtcHh3bml4d21ieWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTYzMzEsImV4cCI6MjA4NzA5MjMzMX0.06bOZQLhELsd5r67UU7FwO-hBHawoPaCIgx6bcZIXe4";
 
-  // Supabase client (UMD build exposes global `supabase`)
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const authCard = document.getElementById("authCard");
@@ -85,35 +85,37 @@
   const authStatus = document.getElementById("authStatus");
   const signOutBtn = document.getElementById("signOutBtn");
   const loginError = document.getElementById("loginError");
+  const loginBtn = document.getElementById("loginBtn");
 
-  document.getElementById("loginBtn").onclick = async () => {
-   document.getElementById("loginBtn").onclick = async () => {
-  loginError.textContent = "Signing in...";
+  console.log("✅ loginBtn found?", !!loginBtn);
 
-  const email = document.getElementById("email").value.trim().toLowerCase();
-  const password = document.getElementById("password").value;
+  loginBtn.addEventListener("click", async () => {
+    loginError.textContent = "Signing in...";
 
-  try {
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    console.log("signInWithPassword:", { data, error });
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
 
-    if (error) {
-      loginError.textContent = "❌ " + error.message;
-      return;
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      console.log("signInWithPassword:", { data, error });
+
+      if (error) {
+        loginError.textContent = "❌ " + error.message;
+        return;
+      }
+
+      loginError.textContent = "";
+      await refreshUI();
+    } catch (e) {
+      console.error("Login threw:", e);
+      loginError.textContent = "❌ " + (e?.message || String(e));
     }
+  });
 
-    loginError.textContent = "";
-    await refreshUI();
-  } catch (e) {
-    console.error("Login threw:", e);
-    loginError.textContent = "❌ " + (e?.message || String(e));
-  }
-};
-
-  signOutBtn.onclick = async () => {
+  signOutBtn.addEventListener("click", async () => {
     await sb.auth.signOut();
     await refreshUI();
-  };
+  });
 
   function toISODate(d) {
     const y = d.getFullYear();
@@ -150,6 +152,7 @@
   async function insertBlock(startISO, endExclusiveISO, ownerName, notes) {
     const inclusiveEnd = addDaysISO(endExclusiveISO, -1);
     const user = (await sb.auth.getUser()).data.user;
+    if (!user) throw new Error("No logged-in user.");
 
     const { error } = await sb.from("blocks").insert({
       start_date: startISO,
@@ -212,6 +215,7 @@
     });
 
     calendar.render();
+    events.forEach(e => calendar.addEvent(e));
   }
 
   async function refreshUI() {
