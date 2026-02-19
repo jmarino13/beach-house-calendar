@@ -87,10 +87,13 @@
   const loginError = document.getElementById("loginError");
 
   document.getElementById("loginBtn").onclick = async () => {
-    loginError.textContent = "Signing in...";
-    const email = document.getElementById("email").value.trim().toLowerCase();
-    const password = document.getElementById("password").value;
+   document.getElementById("loginBtn").onclick = async () => {
+  loginError.textContent = "Signing in...";
 
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+
+  try {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     console.log("signInWithPassword:", { data, error });
 
@@ -101,7 +104,11 @@
 
     loginError.textContent = "";
     await refreshUI();
-  };
+  } catch (e) {
+    console.error("Login threw:", e);
+    loginError.textContent = "❌ " + (e?.message || String(e));
+  }
+};
 
   signOutBtn.onclick = async () => {
     await sb.auth.signOut();
