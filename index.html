@@ -87,16 +87,35 @@
   const authStatus = document.getElementById("authStatus");
   const signOutBtn = document.getElementById("signOutBtn");
 
-  document.getElementById("loginBtn").onclick = async () => {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
-    if (!email || !password) return alert("Enter email and password");
+  const loginError = document.getElementById("loginError");
 
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) return alert(error.message);
+document.getElementById("loginBtn").onclick = async () => {
+  console.log("Login button clicked");
 
-    refreshUI();
-  };
+  loginError.textContent = "";
+
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    console.log("signInWithPassword result:", { data, error });
+
+    if (error) {
+      loginError.textContent = error.message;
+      alert(error.message);
+      return;
+    }
+
+    await refreshUI();
+  } catch (e) {
+    console.error("Login threw:", e);
+    loginError.textContent = e.message || String(e);
+    alert(e.message || e);
+  }
+};
+
 
   signOutBtn.onclick = async () => {
     await sb.auth.signOut();
