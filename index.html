@@ -75,39 +75,28 @@
   </div>
 
 <script>
-  // ✅ Fill these in from your Supabase Project Settings → API
-  const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_Up-LmGCc1StDrP-I9PMj3Q_70wuT5UH";
+  // ✅ Fill these in
+  const SUPABASE_URL = "PASTE_SUPABASE_URL_HERE";
+  const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_HERE";
 
- const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
- <!-- Supabase JS -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-
-
-
-
-
+  // Supabase client (UMD build exposes global `supabase`)
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const authCard = document.getElementById("authCard");
   const appCard = document.getElementById("appCard");
   const authStatus = document.getElementById("authStatus");
   const signOutBtn = document.getElementById("signOutBtn");
 
- document.getElementById("loginBtn").onclick = async () => {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value.trim();
+  document.getElementById("loginBtn").onclick = async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    if (!email || !password) return alert("Enter email and password");
 
-  const { error } = await sb.auth.signInWithPassword({
-    email,
-    password
-  });
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return alert(error.message);
 
-  if (error) return alert(error.message);
-
-  refreshUI();
-};
-
+    refreshUI();
+  };
 
   signOutBtn.onclick = async () => {
     await sb.auth.signOut();
@@ -115,7 +104,6 @@
   };
 
   function toISODate(d) {
-    // FullCalendar gives Date objects in local time; we store only YYYY-MM-DD
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
@@ -133,24 +121,24 @@
       .from("blocks")
       .select("id,start_date,end_date,owner_name,notes,created_by");
 
-    if (error) { alert(error.message); return []; }
+    if (error) {
+      alert(error.message);
+      return [];
+    }
 
-    // FullCalendar uses end as exclusive; if we store inclusive end_date,
-    // we convert by adding 1 day to end.
     return (data || []).map(b => ({
       id: b.id,
       title: b.owner_name + (b.notes ? ` — ${b.notes}` : ""),
       start: b.start_date,
-      end: addDaysISO(b.end_date, 1),
+      end: addDaysISO(b.end_date, 1), // FullCalendar end is exclusive
       allDay: true
     }));
   }
 
   async function insertBlock(startISO, endExclusiveISO, ownerName, notes) {
-    // Convert endExclusive -> inclusive end_date
     const inclusiveEnd = addDaysISO(endExclusiveISO, -1);
-
     const user = (await sb.auth.getUser()).data.user;
+
     const { error } = await sb.from("blocks").insert({
       start_date: startISO,
       end_date: inclusiveEnd,
@@ -158,6 +146,7 @@
       notes: notes || null,
       created_by: user.id
     });
+
     if (error) throw error;
   }
 
@@ -180,28 +169,23 @@
       height: "auto",
 
       select: async (info) => {
+        const owner = document.getElementById("ownerName").value;
+        const notes = document.getElementById("notes").value.trim();
+
         try {
-          const owner = document.getElementById("ownerName").value;
-          const notes = document.getElementById("notes").value.trim();
-          try {
-  await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
-} catch (e) {
-  const msg = (e?.message || "").toLowerCase();
-  if (msg.includes("blocks_no_overlap") || msg.includes("exclude") || msg.includes("overlap")) {
-    alert("Those dates overlap with an existing block. Please pick different dates.");
-  } else {
-    alert(e.message || e);
-  }
-  return;
-}
-
-
-          // refresh
-          calendar.removeAllEvents();
-          (await loadBlocks()).forEach(e => calendar.addEvent(e));
+          await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
         } catch (e) {
-          alert(e.message || e);
+          const msg = (e?.message || "").toLowerCase();
+          if (msg.includes("blocks_no_overlap") || msg.includes("exclude") || msg.includes("overlap")) {
+            alert("Those dates overlap with an existing block. Please pick different dates.");
+          } else {
+            alert(e.message || e);
+          }
+          return;
         }
+
+        calendar.removeAllEvents();
+        (await loadBlocks()).forEach(e => calendar.addEvent(e));
       },
 
       eventClick: async (info) => {
@@ -223,22 +207,6 @@
 
     if (!session) {
       authCard.style.display = "block";
-      appCard.style.display = "none";
-      authStatus.textContent = "Not signed in";
-      signOutBtn.style.display = "none";
-      return;
-    }
 
-    authCard.style.display = "none";
-    appCard.style.display = "block";
-    authStatus.textContent = "Signed in";
-    signOutBtn.style.display = "inline-block";
-
-    if (!calendar) await initCalendar();
-  }
-
-  supabase.auth.onAuthStateChange(() => refreshUI());
-  refreshUI();
-</script>
 </body>
 </html>
