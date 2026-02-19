@@ -73,7 +73,8 @@
   const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_Up-LmGCc1StDrP-I9PMj3Q_70wuT5UH";
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 
   const authCard = document.getElementById("authCard");
   const appCard = document.getElementById("appCard");
