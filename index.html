@@ -107,6 +107,7 @@ document.getElementById("loginBtn").onclick = async () => {
       alert(error.message);
       return;
     }
+<div id="loginError" class="muted" style="margin-top:10px; color:#ffb4b4;"></div>
 
     await refreshUI();
   } catch (e) {
