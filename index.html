@@ -44,14 +44,12 @@
     <div id="authCard" class="card">
       <div style="font-weight:700; margin-bottom:10px;">Sign in</div>
       <div class="row">
-        <input id="email" type="email" placeholder="Email" />
-        <input id="password" type="password" placeholder="Password" />
+        <input id="email" type="email" placeholder="Email" autocomplete="username"/>
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password"/>
         <button id="loginBtn" type="button">Sign In</button>
       </div>
+      <div class="muted" style="margin-top:10px;">Enter your email and password to sign in.</div>
       <div id="loginError" class="error"></div>
-      <div class="muted" style="margin-top:10px;">
-        Enter your email and password to sign in.
-      </div>
     </div>
 
     <div id="appCard" class="card" style="display:none;">
@@ -72,11 +70,10 @@
   </div>
 
 <script>
-  console.log("✅ beach-house-calendar script loaded");
-
-  // Put your real values here (NO trailing slash)
-  const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjYnNrY3BtcHh3bml4d21ieWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTYzMzEsImV4cCI6MjA4NzA5MjMzMX0.06bOZQLhELsd5r67UU7FwO-hBHawoPaCIgx6bcZIXe4";
+  // ✅ Use NO trailing slash
+  const SUPABASE_URL = "https://acbskcpmxwnixwmbyfc.supabase.co";
+  // ✅ Use anon key OR publishable key (either is fine for browser)
+  const SUPABASE_KEY = "PASTE_YOUR_KEY_HERE";
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -86,36 +83,6 @@
   const signOutBtn = document.getElementById("signOutBtn");
   const loginError = document.getElementById("loginError");
   const loginBtn = document.getElementById("loginBtn");
-
-  console.log("✅ loginBtn found?", !!loginBtn);
-
-  loginBtn.addEventListener("click", async () => {
-    loginError.textContent = "Signing in...";
-
-    const email = document.getElementById("email").value.trim().toLowerCase();
-    const password = document.getElementById("password").value;
-
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      console.log("signInWithPassword:", { data, error });
-
-      if (error) {
-        loginError.textContent = "❌ " + error.message;
-        return;
-      }
-
-      loginError.textContent = "";
-      await refreshUI();
-    } catch (e) {
-      console.error("Login threw:", e);
-      loginError.textContent = "❌ " + (e?.message || String(e));
-    }
-  });
-
-  signOutBtn.addEventListener("click", async () => {
-    await sb.auth.signOut();
-    await refreshUI();
-  });
 
   function toISODate(d) {
     const y = d.getFullYear();
@@ -135,24 +102,22 @@
       .from("blocks")
       .select("id,start_date,end_date,owner_name,notes,created_by");
 
-    if (error) {
-      alert(error.message);
-      return [];
-    }
+    if (error) throw error;
 
     return (data || []).map(b => ({
       id: b.id,
       title: b.owner_name + (b.notes ? ` — ${b.notes}` : ""),
       start: b.start_date,
-      end: addDaysISO(b.end_date, 1), // FullCalendar end is exclusive
+      end: addDaysISO(b.end_date, 1), // end exclusive
       allDay: true
     }));
   }
 
   async function insertBlock(startISO, endExclusiveISO, ownerName, notes) {
     const inclusiveEnd = addDaysISO(endExclusiveISO, -1);
-    const user = (await sb.auth.getUser()).data.user;
-    if (!user) throw new Error("No logged-in user.");
+    const { data: userData } = await sb.auth.getUser();
+    const user = userData.user;
+    if (!user) throw new Error("Not signed in.");
 
     const { error } = await sb.from("blocks").insert({
       start_date: startISO,
@@ -173,39 +138,28 @@
   let calendar;
 
   async function initCalendar() {
-  const el = document.getElementById("calendar");
-  const events = await loadBlocks();
+    const el = document.getElementById("calendar");
+    const events = await loadBlocks();
 
-  calendar = new FullCalendar.Calendar(el, {
-    plugins: [dayGridPlugin, interactionPlugin],
-    initialView: "dayGridMonth",
-    selectable: true,
-    selectMirror: true,
-    height: "auto",
-    events,
-    // ... keep the rest of your handlers the same
-  });
+    calendar = new FullCalendar.Calendar(el, {
+      plugins: [dayGridPlugin, interactionPlugin],
+      initialView: "dayGridMonth",
+      selectable: true,
+      selectMirror: true,
+      height: "auto",
+      events,
 
-  calendar.render();
-}
       select: async (info) => {
         const owner = document.getElementById("ownerName").value;
         const notes = document.getElementById("notes").value.trim();
 
         try {
           await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
+          calendar.removeAllEvents();
+          (await loadBlocks()).forEach(e => calendar.addEvent(e));
         } catch (e) {
-          const msg = (e?.message || "").toLowerCase();
-          if (msg.includes("overlap") || msg.includes("exclude")) {
-            alert("Those dates overlap with an existing block. Please pick different dates.");
-          } else {
-            alert(e.message || e);
-          }
-          return;
+          alert(e?.message || String(e));
         }
-
-        calendar.removeAllEvents();
-        (await loadBlocks()).forEach(e => calendar.addEvent(e));
       },
 
       eventClick: async (info) => {
@@ -214,18 +168,16 @@
           await deleteBlock(info.event.id);
           info.event.remove();
         } catch (e) {
-          alert(e.message || e);
+          alert(e?.message || String(e));
         }
       }
     });
 
     calendar.render();
-    events.forEach(e => calendar.addEvent(e));
   }
 
   async function refreshUI() {
     const { data: { session } } = await sb.auth.getSession();
-    console.log("session:", session);
 
     if (!session) {
       authCard.style.display = "block";
@@ -242,6 +194,33 @@
 
     if (!calendar) await initCalendar();
   }
+
+  loginBtn.addEventListener("click", async () => {
+    loginError.textContent = "Signing in...";
+    loginBtn.disabled = true;
+
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
+
+    try {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        loginError.textContent = "❌ " + error.message;
+        return;
+      }
+      loginError.textContent = "";
+      await refreshUI();
+    } catch (e) {
+      loginError.textContent = "❌ " + (e?.message || String(e));
+    } finally {
+      loginBtn.disabled = false;
+    }
+  });
+
+  signOutBtn.addEventListener("click", async () => {
+    await sb.auth.signOut();
+    await refreshUI();
+  });
 
   sb.auth.onAuthStateChange(() => refreshUI());
   refreshUI();
