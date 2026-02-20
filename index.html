@@ -1,18 +1,15 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Beach House Calendar</title>
 
+  <!-- ✅ Use LOCAL assets ONLY (best for iPhone Safari stability) -->
   <link rel="stylesheet" href="./assets/fullcalendar/index.global.min.css">
-<script src="./assets/fullcalendar/index.global.min.js"></script>
-<script src="./assets/supabase/supabase.min.js"></script>
+  <script src="./assets/fullcalendar/index.global.min.js"></script>
 
-  <!-- Supabase (UMD build exposes global `supabase`) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="./assets/supabase/supabase.min.js"></script>
 
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#0b1220; color:#eaf0ff; }
@@ -22,10 +19,7 @@
     input, select, button { padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25); color: #eaf0ff; }
     button { cursor:pointer; }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    #calendar {
-  margin-top: 14px;
-  min-height: 500px;
-}
+    #calendar { margin-top: 14px; min-height: 520px; }
     .muted { opacity:.8; font-size: 13px; }
     .error { margin-top:10px; color:#ffb4b4; font-size:13px; white-space: pre-wrap; }
   </style>
@@ -49,7 +43,7 @@
       <div class="row">
         <input id="email" type="email" placeholder="Email" autocomplete="username" />
         <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
-        <button id="loginBtn">Sign In</button>
+        <button id="loginBtn" type="button">Sign In</button>
       </div>
       <div class="muted" style="margin-top:10px;">Enter your email and password to sign in.</div>
       <div id="loginError" class="error"></div>
@@ -75,13 +69,14 @@
   </div>
 
 <script>
-  // ✅ IMPORTANT: exact URL, no trailing slash
+  // ✅ Your exact values (no trailing slash)
   const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
-  // ✅ Use your ANON/PUBLISHABLE key (NOT service_role)
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjYnNrY3BtcHh3bml4d21ieWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTYzMzEsImV4cCI6MjA4NzA5MjMzMX0.06bOZQLhELsd5r67UU7FwO-hBHawoPaCIgx6bcZIXe4";
 
+  // Supabase client (your local UMD exposes window.supabase)
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // UI elements
   const authCard = document.getElementById("authCard");
   const appCard = document.getElementById("appCard");
   const authStatus = document.getElementById("authStatus");
@@ -89,6 +84,7 @@
   const loginBtn = document.getElementById("loginBtn");
   const loginError = document.getElementById("loginError");
 
+  // Helpers
   function toISODate(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -114,14 +110,17 @@
       id: b.id,
       title: b.owner_name + (b.notes ? ` — ${b.notes}` : ""),
       start: b.start_date,
-      end: addDaysISO(b.end_date, 1), // FullCalendar end is exclusive
-      allDay: true
+      end: addDaysISO(b.end_date, 1), // FullCalendar expects end exclusive
+      allDay: true,
+      extendedProps: { created_by: b.created_by }
     }));
   }
 
   async function insertBlock(startISO, endExclusiveISO, ownerName, notes) {
     const inclusiveEnd = addDaysISO(endExclusiveISO, -1);
-    const { data: userData } = await sb.auth.getUser();
+
+    const { data: userData, error: userErr } = await sb.auth.getUser();
+    if (userErr) throw userErr;
     const user = userData?.user;
     if (!user) throw new Error("Not signed in.");
 
@@ -141,54 +140,53 @@
     if (error) throw error;
   }
 
-  let calendar;
+  // Calendar
+  let calendar = null;
 
- async function initCalendar() {
-  const el = document.getElementById("calendar");
-
-  if (!el) {
-    console.error("Calendar div not found");
-    return;
+  async function refreshCalendarEvents() {
+    if (!calendar) return;
+    const events = await loadBlocks();
+    calendar.removeAllEvents();
+    events.forEach(e => calendar.addEvent(e));
   }
 
-  const events = await loadBlocks();
+  async function initCalendar() {
+    const el = document.getElementById("calendar");
+    if (!el) throw new Error("Calendar div not found.");
 
-  calendar = new FullCalendar.Calendar(el, {
-    initialView: "dayGridMonth",
-    selectable: true,
-    height: "auto",
-    expandRows: true,
-    contentHeight: "auto",
+    const events = await loadBlocks();
 
-    events,
+    // FullCalendar global bundle exposes window.FullCalendar
+    calendar = new FullCalendar.Calendar(el, {
+      initialView: "dayGridMonth",
+      selectable: true,
+      selectMirror: true,
+      height: "auto",
+      expandRows: true,
+      contentHeight: "auto",
+      events,
 
-    select: async (info) => {
-      const owner = document.getElementById("ownerName").value;
-      const notes = document.getElementById("notes").value.trim();
+      // Create a block by selecting days
+      select: async (info) => {
+        const owner = document.getElementById("ownerName").value;
+        const notes = document.getElementById("notes").value.trim();
 
-      try {
-        await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
-        calendar.refetchEvents();
-      } catch (e) {
-        alert(e.message || e);
-      }
-    },
-
-    eventClick: async (info) => {
-      if (!confirm("Delete this block?")) return;
-      try {
-        await deleteBlock(info.event.id);
-        info.event.remove();
-      } catch (e) {
-        alert(e.message || e);
-      }
-    }
-  });
-
-  calendar.render();
-}
+        try {
+          await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
+          await refreshCalendarEvents();
+        } catch (e) {
+          const msg = (e?.message || String(e)).toLowerCase();
+          if (msg.includes("overlap") || msg.includes("exclude")) {
+            alert("Those dates overlap with an existing block. Please pick different dates.");
+          } else {
+            alert(e?.message || String(e));
+          }
+        } finally {
+          calendar.unselect();
+        }
       },
 
+      // Delete (RLS should restrict to creator)
       eventClick: async (info) => {
         if (!confirm("Delete this block?")) return;
         try {
@@ -203,6 +201,7 @@
     calendar.render();
   }
 
+  // Auth UI
   async function refreshUI() {
     const { data: { session } } = await sb.auth.getSession();
 
@@ -219,14 +218,14 @@
     authStatus.textContent = "Signed in";
     signOutBtn.style.display = "inline-block";
 
-    if (!calendar) await initCalendar();
-    else {
-      const updated = await loadBlocks();
-      calendar.removeAllEvents();
-      updated.forEach(e => calendar.addEvent(e));
+    if (!calendar) {
+      await initCalendar();
+    } else {
+      await refreshCalendarEvents();
     }
   }
 
+  // Login handler (single, clean)
   loginBtn.onclick = async () => {
     loginError.textContent = "";
     loginBtn.disabled = true;
@@ -236,14 +235,10 @@
     const password = document.getElementById("password").value;
 
     try {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      console.log("signInWithPassword:", { data, error });
-
+      const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
-
       await refreshUI();
     } catch (e) {
-      console.error("Login error:", e);
       loginError.textContent = "❌ " + (e?.message || String(e));
     } finally {
       loginBtn.disabled = false;
