@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Beach House Calendar</title>
 
-  <!-- ✅ Use LOCAL assets ONLY (best for iPhone Safari stability) -->
-  <link rel="stylesheet" href="./assets/fullcalendar/index.global.min.css">
-  <script src="./assets/fullcalendar/index.global.min.js"></script>
+  <!-- ✅ FullCalendar (single global bundle + CSS) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
-  <script src="./assets/supabase/supabase.min.js"></script>
+  <!-- ✅ Supabase UMD -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#0b1220; color:#eaf0ff; }
@@ -69,14 +70,11 @@
   </div>
 
 <script>
-  // ✅ Your exact values (no trailing slash)
   const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjYnNrY3BtcHh3bml4d21ieWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTYzMzEsImV4cCI6MjA4NzA5MjMzMX0.06bOZQLhELsd5r67UU7FwO-hBHawoPaCIgx6bcZIXe4";
 
-  // Supabase client (your local UMD exposes window.supabase)
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // UI elements
   const authCard = document.getElementById("authCard");
   const appCard = document.getElementById("appCard");
   const authStatus = document.getElementById("authStatus");
@@ -84,7 +82,6 @@
   const loginBtn = document.getElementById("loginBtn");
   const loginError = document.getElementById("loginError");
 
-  // Helpers
   function toISODate(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -110,9 +107,8 @@
       id: b.id,
       title: b.owner_name + (b.notes ? ` — ${b.notes}` : ""),
       start: b.start_date,
-      end: addDaysISO(b.end_date, 1), // FullCalendar expects end exclusive
+      end: addDaysISO(b.end_date, 1),
       allDay: true,
-      extendedProps: { created_by: b.created_by }
     }));
   }
 
@@ -140,7 +136,6 @@
     if (error) throw error;
   }
 
-  // Calendar
   let calendar = null;
 
   async function refreshCalendarEvents() {
@@ -152,11 +147,8 @@
 
   async function initCalendar() {
     const el = document.getElementById("calendar");
-    if (!el) throw new Error("Calendar div not found.");
-
     const events = await loadBlocks();
 
-    // FullCalendar global bundle exposes window.FullCalendar
     calendar = new FullCalendar.Calendar(el, {
       initialView: "dayGridMonth",
       selectable: true,
@@ -166,27 +158,19 @@
       contentHeight: "auto",
       events,
 
-      // Create a block by selecting days
       select: async (info) => {
         const owner = document.getElementById("ownerName").value;
         const notes = document.getElementById("notes").value.trim();
-
         try {
           await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
           await refreshCalendarEvents();
         } catch (e) {
-          const msg = (e?.message || String(e)).toLowerCase();
-          if (msg.includes("overlap") || msg.includes("exclude")) {
-            alert("Those dates overlap with an existing block. Please pick different dates.");
-          } else {
-            alert(e?.message || String(e));
-          }
+          alert(e?.message || String(e));
         } finally {
           calendar.unselect();
         }
       },
 
-      // Delete (RLS should restrict to creator)
       eventClick: async (info) => {
         if (!confirm("Delete this block?")) return;
         try {
@@ -199,9 +183,16 @@
     });
 
     calendar.render();
+
+    // ✅ Mobile Safari: render/update after layout is visible
+    requestAnimationFrame(() => {
+      try { calendar.updateSize(); } catch (_) {}
+    });
+    setTimeout(() => {
+      try { calendar.updateSize(); } catch (_) {}
+    }, 200);
   }
 
-  // Auth UI
   async function refreshUI() {
     const { data: { session } } = await sb.auth.getSession();
 
@@ -218,14 +209,13 @@
     authStatus.textContent = "Signed in";
     signOutBtn.style.display = "inline-block";
 
-    if (!calendar) {
-      await initCalendar();
-    } else {
+    if (!calendar) await initCalendar();
+    else {
       await refreshCalendarEvents();
+      try { calendar.updateSize(); } catch (_) {}
     }
   }
 
-  // Login handler (single, clean)
   loginBtn.onclick = async () => {
     loginError.textContent = "";
     loginBtn.disabled = true;
