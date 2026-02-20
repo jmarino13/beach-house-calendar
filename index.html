@@ -10,6 +10,8 @@
 <script src="./assets/supabase/supabase.min.js"></script>
 
   <!-- Supabase (UMD build exposes global `supabase`) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <style>
@@ -20,7 +22,10 @@
     input, select, button { padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25); color: #eaf0ff; }
     button { cursor:pointer; }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    #calendar { margin-top: 14px; }
+    #calendar {
+  margin-top: 14px;
+  min-height: 500px;
+}
     .muted { opacity:.8; font-size: 13px; }
     .error { margin-top:10px; color:#ffb4b4; font-size:13px; white-space: pre-wrap; }
   </style>
@@ -138,29 +143,50 @@
 
   let calendar;
 
-  async function initCalendar() {
-    const el = document.getElementById("calendar");
-    const events = await loadBlocks();
+ async function initCalendar() {
+  const el = document.getElementById("calendar");
 
-    calendar = new FullCalendar.Calendar(el, {
-      plugins: [FullCalendar.dayGridPlugin, FullCalendar.interactionPlugin],
-      initialView: "dayGridMonth",
-      selectable: true,
-      selectMirror: true,
-      height: "auto",
+  if (!el) {
+    console.error("Calendar div not found");
+    return;
+  }
 
-      select: async (info) => {
-        const owner = document.getElementById("ownerName").value;
-        const notes = document.getElementById("notes").value.trim();
+  const events = await loadBlocks();
 
-        try {
-          await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
-          const updated = await loadBlocks();
-          calendar.removeAllEvents();
-          updated.forEach(e => calendar.addEvent(e));
-        } catch (e) {
-          alert(e?.message || String(e));
-        }
+  calendar = new FullCalendar.Calendar(el, {
+    initialView: "dayGridMonth",
+    selectable: true,
+    height: "auto",
+    expandRows: true,
+    contentHeight: "auto",
+
+    events,
+
+    select: async (info) => {
+      const owner = document.getElementById("ownerName").value;
+      const notes = document.getElementById("notes").value.trim();
+
+      try {
+        await insertBlock(toISODate(info.start), toISODate(info.end), owner, notes);
+        calendar.refetchEvents();
+      } catch (e) {
+        alert(e.message || e);
+      }
+    },
+
+    eventClick: async (info) => {
+      if (!confirm("Delete this block?")) return;
+      try {
+        await deleteBlock(info.event.id);
+        info.event.remove();
+      } catch (e) {
+        alert(e.message || e);
+      }
+    }
+  });
+
+  calendar.render();
+}
       },
 
       eventClick: async (info) => {
