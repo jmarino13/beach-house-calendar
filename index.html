@@ -177,7 +177,7 @@
     const events = await loadBlocks();
 
     calendar = new FullCalendar.Calendar(el, {
-      plugins: [FullCalendarDayGrid, FullCalendarInteraction],
+     plugins: [dayGridPlugin, interactionPlugin],
       initialView: "dayGridMonth",
       selectable: true,
       selectMirror: true,
