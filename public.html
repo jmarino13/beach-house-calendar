@@ -3,92 +3,131 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Beach House Availability</title>
+  <title>Beach House Calendar - Public View</title>
 
   <!-- FullCalendar -->
-  <link href="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/index.global.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/index.global.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.15/index.global.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
-  <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#0b1220; color:#eaf0ff; }
-    header { padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,.12); }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
-    .card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 14px; }
-    .muted { opacity:.8; font-size: 13px; }
-    a { color: #b8d7ff; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 0;
+      background:#0b1220;
+      color:#eaf0ff;
+    }
+
+    header {
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    #calendar {
+      margin-top: 14px;
+      min-height: 520px;
+    }
+
+    .muted {
+      opacity:.8;
+      font-size: 13px;
+    }
   </style>
 </head>
-<body>
-  <header>
-    <div style="font-weight:700;">Beach House Availability</div>
-    <div class="muted">Blocked dates are shown as “Unavailable”. No owner names are displayed.</div>
-  </header>
 
-  <div class="wrap">
-    <div class="card">
-      <div id="calendar"></div>
-      <div class="muted" style="margin-top:10px;">
-        Owner login calendar: <a href="./index.html">Go to owner calendar</a>
-      </div>
-    </div>
+<body>
+
+<header>
+  <div>
+    <div style="font-weight:700;">Beach House Calendar</div>
+    <div class="muted">Public Availability View</div>
   </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <div id="calendar"></div>
+  </div>
+</div>
 
 <script>
-  // ✅ Same Supabase Project Settings → API values
-  const SUPABASE_URL = "PASTE_SUPABASE_URL_HERE";
-  const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_HERE";
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const SUPABASE_URL = "https://acbskcpmpxwnixwmbyfc.supabase.co";
+  const SUPABASE_KEY = "YOUR_ANON_KEY_HERE"; // same anon key as index.html
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   function toISODate(d) {
     const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
     return `${y}-${m}-${day}`;
   }
 
   function addDaysISO(iso, days) {
-    const d = new Date(iso + "T00:00:00");
-    d.setDate(d.getDate() + days);
+    const d = new Date(iso+"T00:00:00");
+    d.setDate(d.getDate()+days);
     return toISODate(d);
   }
 
   async function loadPublicBlocks() {
-    // Calls the RPC that returns only start/end dates
-    const { data, error } = await supabase.rpc("public_get_blocks");
-    if (error) throw error;
+    const { data, error } = await sb
+      .from("blocks")
+      .select("id,start_date,end_date,owner_name,notes")
+      .order("start_date", { ascending: true });
 
-    // Convert inclusive end_date to FullCalendar's exclusive end
+    if (error) {
+      console.error(error);
+      return [];
+    }
+
     return (data || []).map(b => ({
-      title: "Unavailable",
+      id: b.id,
+      title: b.owner_name,
       start: b.start_date,
-      end: addDaysISO(b.end_date, 1),
+      end: addDaysISO(b.end_date,1),
       allDay: true
     }));
   }
 
-  async function init() {
-    const el = document.getElementById("calendar");
+  async function initCalendar() {
+
     const events = await loadPublicBlocks();
 
-    const calendar = new FullCalendar.Calendar(el, {
-      plugins: [FullCalendarDayGrid],
-      initialView: "dayGridMonth",
-      selectable: false,
-      height: "auto",
-      events
-    });
+    const calendar = new FullCalendar.Calendar(
+      document.getElementById("calendar"),
+      {
+        initialView: window.innerWidth < 700 ? "dayGridWeek" : "dayGridMonth",
+        height: "auto",
+        expandRows: true,
+        events
+      }
+    );
 
     calendar.render();
   }
 
-  init().catch(e => {
-    alert(e.message || e);
-  });
+  initCalendar();
+
 </script>
+
 </body>
 </html>
