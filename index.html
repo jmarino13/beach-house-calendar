@@ -173,16 +173,21 @@
   let calendar;
 
   async function initCalendar() {
-    const el = document.getElementById("calendar");
-    const events = await loadBlocks();
+  const el = document.getElementById("calendar");
+  const events = await loadBlocks();
 
-    calendar = new FullCalendar.Calendar(el, {
-     plugins: [dayGridPlugin, interactionPlugin],
-      initialView: "dayGridMonth",
-      selectable: true,
-      selectMirror: true,
-      height: "auto",
+  calendar = new FullCalendar.Calendar(el, {
+    plugins: [dayGridPlugin, interactionPlugin],
+    initialView: "dayGridMonth",
+    selectable: true,
+    selectMirror: true,
+    height: "auto",
+    events,
+    // ... keep the rest of your handlers the same
+  });
 
+  calendar.render();
+}
       select: async (info) => {
         const owner = document.getElementById("ownerName").value;
         const notes = document.getElementById("notes").value.trim();
